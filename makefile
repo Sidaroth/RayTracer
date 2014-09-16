@@ -1,7 +1,7 @@
 # The compiler
 CC=g++
 # Flags for the compiler
-CFLAGS=-c -std=gnu++11 -Wall
+CFLAGS=-c -Wall
 
 # Name of the executable
 EXECUTABLE=RayTracer.exe
@@ -19,10 +19,10 @@ INC=
 # Flags for the linker. (When adding new libraries, add another flag here, as such: -lexample-lib) PS: These are the libexample-lib.so files, with the lib prefix and .so extension removed. 
 #CURLFLAGS=   -lcurl
 
-LFLAGS=-lpthread #$(CURLFLAGS)
+LFLAGS= #$(CURLFLAGS)
 
 # Source files (Add your files here for compilation. *Only the .cpp files*)
-SOURCES=main.cpp
+SOURCES= ./src/main.cpp
 
 
 ### !!!! DO NOT TOUCH ANYTHING BELOW THIS LINE EXCEPT CLEAN!!!! ###
