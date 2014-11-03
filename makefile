@@ -1,7 +1,7 @@
 # The compiler
 CC=g++
 # Flags for the compiler
-CFLAGS=-c -Wall -std=c++11
+CFLAGS=-c -Wall -std=c++11 -fopenmp
 
 # Name of the executable
 EXECUTABLE=RayTracer.exe
@@ -22,7 +22,7 @@ INC=-I ./include/
 LFLAGS= #$(CURLFLAGS)
 
 # Source files (Add your files here for compilation. *Only the .cpp files*)
-SOURCES= ./src/main.cpp ./src/Sphere.cpp ./src/Vector3d.cpp
+SOURCES= ./src/main.cpp ./src/Sphere.cpp ./src/Vector3d.cpp ./src/Ray.cpp
 
 
 ### !!!! DO NOT TOUCH ANYTHING BELOW THIS LINE EXCEPT CLEAN!!!! ###

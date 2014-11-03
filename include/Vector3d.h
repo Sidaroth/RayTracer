@@ -48,4 +48,8 @@ public:
 	Vector3d unit();									// Returns a vector pointing in the same direction, but with unit length (lenght of 1)
 	double squaredLength();								// Returns the square of the length of the vector. Useful when you just want to compare two vectors
 														// to see which is longest, as this avoids computing the square roots. 
+
+	// TODO: add more functionality from:
+	// http://scratchapixel.com/lessons/3d-basic-lessons/lesson-4-geometry/math-operations-on-points-and-vectors/
+	// http://scratchapixel.com/lessons/3d-basic-lessons/lesson-4-geometry/how-does-matrix-work-part-1/ 
 };
