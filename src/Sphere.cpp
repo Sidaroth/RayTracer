@@ -58,7 +58,7 @@ Sphere::Sphere(double radius, Vector3d position, Vector3d emission,
 // Distance = -(loc) +- sqroot(det)
 // @Return: 0 if miss, distance to closest hit if hit. 
 // Beware -- This function relies heavily on overloaded operators from Vector3d.
-double Sphere::intersect(Ray &ray)
+double Sphere::intersect(const Ray &ray)
 {
 	Vector3d oc = ray.origin - this -> position; 		// (o-c)
 	double loc = ray.direction.dot(oc); 		    	// (l dot (o -c)

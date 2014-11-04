@@ -23,5 +23,5 @@ public:
 	Sphere(double radius, Vector3d position, Vector3d emission,
 		   Vector3d color, MaterialType materialType);
 
-	double intersect(Ray &ray);
+	double intersect(const Ray &ray);
 };

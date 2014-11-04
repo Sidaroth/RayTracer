@@ -7,7 +7,7 @@ CFLAGS=-c -Wall -std=c++11 -fopenmp -lpthread
 EXECUTABLE=RayTracer.exe
 
 # Output files from the executable
-OUTPUT=
+OUTPUT=image.ppm
 
 # Edit these to add additional libraries. 
 # Libraries to include. (Prefix all additional libs with -L, like such: -L/example/dir/lib)
@@ -45,6 +45,6 @@ $(EXECUTABLE): $(OBJECTS)
 # if you need to update object files / the executable and the make file does not want to update. This can sometimes happen if only header files have been edited. 
 # Edit this (read: add to this) if you need to remove additional files when running "make clean". 
 clean:
-	rm -f *.o
+	rm -f ./src/*.o
 	rm -f $(EXECUTABLE)
 	rm -f $(OUTPUT)

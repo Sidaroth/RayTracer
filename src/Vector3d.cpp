@@ -33,31 +33,31 @@ Vector3d::~Vector3d()
 ////////////////////// VECTOR OPERATORS ///////////////////////
 
 /// Returns the sum of the two vectors.
-Vector3d Vector3d::operator+ (Vector3d vect)
+Vector3d Vector3d::operator+ (const Vector3d& vect) const
 {
 	return Vector3d(x + vect.x, y + vect.y, z + vect.z);
 }
 
 /// Returns the difference between the two vectors.
-Vector3d Vector3d::operator- (Vector3d vect)
+Vector3d Vector3d::operator- (const Vector3d& vect) const
 {
 	return Vector3d(x - vect.x, y - vect.y, z - vect.z);
 }
 
 /// Returns the component-wise multiplication of the vectors
-Vector3d Vector3d::operator* (Vector3d vect)
+Vector3d Vector3d::operator* (const Vector3d& vect) const
 {
 	return Vector3d(x * vect.x, y * vect.y, z * vect.z);
 }
 
 /// Returns the component-wise division of the vectors
-Vector3d Vector3d::operator/ (Vector3d vect)
+Vector3d Vector3d::operator/ (const Vector3d& vect) const
 {
 	return Vector3d(x / vect.x, y / vect.y, z / vect.y);
 }
 
 /// Sets the vector equal to the parameter vector. 
-void Vector3d::operator= (Vector3d vect)
+void Vector3d::operator= (const Vector3d& vect)
 {
 	x = vect.x;
 	y = vect.y;
@@ -67,19 +67,19 @@ void Vector3d::operator= (Vector3d vect)
 ////////////////////// SCALAR OPERATORS ///////////////////////
 
 /// Returns the vector with all components multiplied by the scalar parameter
-Vector3d Vector3d::operator* (double scalar)
+Vector3d Vector3d::operator* (const double& scalar) const
 {
 	return Vector3d(x * scalar, y * scalar, z * scalar); 
 }
 
 /// Returns the vector with all components divided by the scalar parameter
-Vector3d Vector3d::operator/ (double scalar)
+Vector3d Vector3d::operator/ (const double& scalar) const
 {
 	return Vector3d(x / scalar, y / scalar, z / scalar);
 }
 
 /// Subtracts the scalar from all components. 
-void Vector3d::operator-= (double scalar)
+void Vector3d::operator-= (const double& scalar)
 {
 	x = x - scalar;
 	y = y - scalar;
@@ -87,7 +87,7 @@ void Vector3d::operator-= (double scalar)
 }
 
 /// Adds the scalar to all components.
-void Vector3d::operator+= (double scalar)
+void Vector3d::operator+= (const double& scalar)
 {
 	x = x + scalar;
 	y = y + scalar;
@@ -101,7 +101,7 @@ void Vector3d::operator+= (double scalar)
 /// -- sum of the component-wise multiplication
 /// -- Where A is this, and B is other. 
 /// -- a1*b1 + a2*b2 + a3*b3
-double Vector3d::dot (Vector3d vect)
+double Vector3d::dot (const Vector3d& vect) const
 {
 	return (x * vect.x + y * vect.y + z * vect.z);
 }
@@ -112,7 +112,7 @@ double Vector3d::dot (Vector3d vect)
 /// -- c1 = a2 * b3 - a3 * b2
 /// -- c2 = a3 * b1 - a1 * b3
 /// -- c3 = a1 * b2 - a2 * b1
-Vector3d Vector3d::cross (Vector3d vect)
+Vector3d Vector3d::cross (const Vector3d& vect) const
 {
 	Vector3d result;
 	result.x = y * vect.z - z * vect.y;
@@ -128,20 +128,20 @@ Vector3d Vector3d::cross (Vector3d vect)
 
 /// Returns the square of the length of the vector. Useful when you just want to compare two vectors
 /// to see which is longest, as this avoids computing the square roots. 
-double Vector3d::squaredLength()
+double Vector3d::squaredLength() const
 {
 	return (x * x + y * y + z * z);
 }
 
 /// returns the length of the vector
-double Vector3d::length()
+double Vector3d::length() const
 {
 	return sqrt(squaredLength());
 }
 
 
 /// Returns a vector pointing in the same direction, but with unit length (length of 1)
-Vector3d Vector3d::unit()
+Vector3d Vector3d::unit() const
 {
 	double length = this -> length();
 	return Vector3d(x / length, y / length, z / length);

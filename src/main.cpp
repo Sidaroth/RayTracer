@@ -25,18 +25,20 @@
 #include "globals.h"                                                                                  
 
 /// CONSTANTS
-const double      INFINITYAPP = 1e20;                                                                         // Our approximation of infinity. 
-const int         SAMPLES     = 50;                                                                           // Number of samples per subpixel
-const int         WIDTH       = 1024;                                                                          // Resolution of the final image
-const int         HEIGHT      = 768;
-const double      FOVANGLE    = 0.5135;
-const int         XSUBSAMPLES = 2;                                                                         // Number of samples to split a pixel into. 
-const int         YSUBSAMPLES = 2;
-const std::string FILENAME    = "image.ppm";
-const long long   SEED        = 31415926535;
+const double      INFINITYAPP     = 1e20;                                                                         // Our approximation of infinity. 
+const int         SAMPLES         = 50;                                                                           // Number of samples per subpixel
+const int         WIDTH           = 1024;                                                                          // Resolution of the final image
+const int         HEIGHT          = 768;
+const double      FOVANGLE        = 0.5135;
+const int         XSUBSAMPLES     = 2;                                                                         // Number of samples to split a pixel into. 
+const int         YSUBSAMPLES     = 2;
+const std::string FILENAME        = "image.ppm";
+const long long   SEED            = 31415926535;
+const int         RECURSIVE_LIMIT = 10;
+const int         ROULETTE_LIMIT  = 5;
 
 /// Function decl. 
-bool     intersectCheck(Ray&, double&, double&);
+bool     intersectCheck(const Ray&, double&, int&);
 Vector3d radiance(const Ray&, int, int E=1);
 double   clamp(double);
 void     writeToFile();
@@ -71,11 +73,12 @@ int main()
   std::chrono::duration<double> elapsedSeconds;
   start = std::chrono::system_clock::now();
 
+  omp_lock_t writeLock;
+  omp_init_lock(&writeLock);
 
   Ray camera(Vector3d(50, 52, 295.6), Vector3d(0, -0.042612, -1).unit());                  // Camera position and direction. Also taken from SmallPT to match the scene. 
   Vector3d cx = Vector3d(WIDTH * FOVANGLE / HEIGHT, 0, 0);                                 // X-direction increment. (assumes a camera that is upright) - X camera direction. 
   Vector3d cy = cx.cross(camera.direction).unit() * FOVANGLE;                              // Y-direction increment. (cross product gets vector perpendicular to CX and gaze direction - the vertical up vector)
-
   Vector3d color;                                                                          // Color of a single sample. 
 
   ///////// CREATE THE IMAGE ///////////////
@@ -84,7 +87,9 @@ int main()
   {
     now = std::chrono::system_clock::now();
     elapsedSeconds = now - start;
-    printf("\nRendering (%d samples): %5.2f%%. Elapsed time: %fs", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
+    omp_set_lock(&writeLock);
+    printf("\rRendering (%d samples): %5.2f%%. Elapsed time: %fs", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
+    omp_unset_lock(&writeLock);
 
     for(unsigned short x = 0; x < WIDTH; ++x)                                              // Image columns. 
     {
@@ -120,12 +125,72 @@ int main()
   end = std::chrono::system_clock::now();
   elapsedSeconds = end - start;
 
-  printf("\n\nSucessfully wrote to file (%s). Total time taken to trace: %f seconds.", FILENAME.c_str(),elapsedSeconds.count());
+  printf("\n\nSucessfully wrote to file (%s). Total time taken to trace: %f seconds.\n", FILENAME.c_str(),elapsedSeconds.count());
+  omp_destroy_lock(&writeLock);
 	
   return 0;
 }
 
 ///////// FUNCTIONS /////////
+
+/// Any reference to Vector3d(); is a Vector with values (0, 0, 0) for RGB, i.e black. 
+Vector3d radiance(const Ray &ray, int depth, int E)
+{
+  double distance;                        // Distance to intersection
+  int id = 0; 
+  if(!intersectCheck(ray, distance, id))
+  {
+    return Vector3d();                    // We missed. 
+  }
+
+  const Sphere &sphere = spheres[id];     // The sphere hit. 
+
+  if(depth > RECURSIVE_LIMIT)                          // Recursion depth check
+  {
+    return Vector3d();
+  }
+
+  Vector3d intersectPoint = ray.origin + ray.direction * distance;
+  Vector3d normal         = (intersectPoint - sphere.position).unit();
+  Vector3d surfaceNormal  = normal.dot(ray.direction) < 0 ? normal : normal * -1; 
+  Vector3d BRDFModulator  = sphere.color;
+
+  // Use maximum reflectance for Russian Roulette. 
+  double maxRefl;
+
+  if(BRDFModulator.x > BRDFModulator.y && BRDFModulator.x > BRDFModulator.z)
+  {
+    maxRefl = BRDFModulator.x;
+  }
+  else if(BRDFModulator.y > BRDFModulator.z)
+  {
+    maxRefl = BRDFModulator.y;
+  }
+  else
+  {
+    maxRefl = BRDFModulator.z;
+  }
+
+  if(++depth > ROULETTE_LIMIT || !maxRefl)                                 // Only do russian roulette after a recursion depth of ROULETTE_LIMIT. 
+  {
+    if(distribution(mtGenerator) < maxRefl)
+    {
+      BRDFModulator = BRDFModulator * (1 / maxRefl);
+    }
+    else
+    {
+      return sphere.emission * E;
+    }
+  }
+
+  // IDEAL DIFFUSE REFLECTION
+  if(sphere.materialType == MaterialType::DIFFUSE)
+  {
+
+  }
+
+  return Vector3d();
+}
 
 /// Format: http://netpbm.sourceforge.net/doc/ppm.html#plainppm 
 void writeToFile()
@@ -160,7 +225,7 @@ int convertToIntegerRange(double value)
 }
 
 
-bool intersectCheck(Ray &ray, double &temporary, double &id)
+bool intersectCheck(const Ray &ray, double &temporary, int &id)
 {
   temporary = INFINITYAPP;                                       // Used to store the current closest ray hit. 
   double distance;
@@ -194,12 +259,4 @@ double clamp(double value)
   {
     return value;
   }
-}
-
-Vector3d radiance(const Ray &ray, int depth, int E)
-{
-
-
-
-  return Vector3d();
 }
