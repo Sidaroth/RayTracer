@@ -11,13 +11,17 @@
 #include <cstdio>
 #include <iostream>
 #include <omp.h>
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <chrono>
 #include "Sphere.h"
 #include "Vector3d.h"
 #include "globals.h"                                                                                  
 
 /// CONSTS
 const double INFINITY = 1e20;                                                                         // Our approximation of infinity. 
-const int    SAMPLES  = 10;                                                                           // Number of samples per subpixel
+const int    SAMPLES  = 50;                                                                           // Number of samples per subpixel
 const int    WIDTH    = 1024;                                                                          // Resolution of the final image
 const int    HEIGHT   = 768;
 const double FOVANGLE = 0.5135;
@@ -28,6 +32,9 @@ const int    YSUBSAMPLES = 2;
 bool intersectCheck(Ray, double, double);
 Vector3d radiance(Ray, int, unsigned short);
 double clamp(double);
+bool writeToFile();
+double applyGamma(double);
+int    convertToIntegerRange(double);
 
 
 // Scene from smallPT. 
@@ -82,25 +89,67 @@ int main()
             double dy = r2 < 1 ? (sqrt(r2) - 1) : 1 - sqrt(2 - r2);
 
             ///////////// Determining the color ///////////////////////////
-            double xDir = ((sx + 0.5 + dx) / 2 + x) / WIDTH - 0.5;                         // Adjusting ray direction.  
+            double xDir = ((sx + 0.5 + dx) / 2 + x) / WIDTH  - 0.5;                         // Adjusting ray direction.  
             double yDir = ((sy + 0.5 + dy) / 2 + y) / HEIGHT - 0.5;
             Vector3d direction = (cx * xDir) + (cy * yDir) + camera.direction;
 
-            color = color + radiance(Ray(camera.origin + direction * 140, direction.unit()), 0, Xi) * (1.0 / SAMPLES);
+            color = color + radiance(Ray(camera.origin + direction * 140, direction.unit()), 0, Xi) * (1.0 / SAMPLES);    // rays are pushed forward (140) to start inside the room. 
           }
 
           image[pixel] = image[pixel] + Vector3d(clamp(color.x), clamp(color.y), clamp(color.z)) * 0.25;
-
         }
       }
     }
   }
 
+  if(writeToFile())
+  {
+    printf("ERROR: Writing to file failed");
+    return 0;
+  }
+  else
+  {
+	  return -31415;  
+  }
 
-  /////// WRITE IMAGE TO FILE ///////
-
-	return 0; 
 }
+
+///////// FUNCTIONS /////////
+
+/// Format: http://netpbm.sourceforge.net/doc/ppm.html#plainppm 
+bool writeToFile()
+{
+  ofstream file;
+  file.open("image.ppm");
+  file << "P3\n" << WIDTH << " " << HEIGHT << "\n255\n";
+
+  for(int pixel = 0; i < WIDTH * HEIGHT; ++pixel)
+  {
+     int r = convertToIntegerRange(applyGamma(image[pixel].x));
+     int g = convertToIntegerRange(applyGamma(image[pixel].y));
+     int b = convertToIntegerRange(applyGamma(image[pixel].z));
+  
+     file << r << " " << g << " " << b << " ";
+  }
+
+  file.close()
+;1
+  return false;
+}
+
+/// Applies a gamma correction constant. 
+/// A value of 2.2 is normal: http://en.wikipedia.org/wiki/Gamma_correction 
+double applyGamma(double value)
+{
+  return pow(clamp(value), 1 / 2.2);
+}
+
+/// Takes a floating point value in the range [0.0, 1.0] and returns an integer in the range [0, 255]
+int convertToIntegerRange(double value)
+{
+  return int(value * 255 + 0.5);
+}
+
 
 bool intersectCheck(Ray &ray, double &temporary, double &id)
 {
