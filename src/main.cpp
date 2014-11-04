@@ -19,6 +19,7 @@
 #include <ctime>
 #include <string>
 #include <fstream>
+#include <cassert>
 #include <random>
 #include "Sphere.h"
 #include "Vector3d.h"
@@ -26,14 +27,14 @@
 
 /// CONSTANTS
 const double      INFINITYAPP     = 1e20;                                                                         // Our approximation of infinity. 
-const int         SAMPLES         = 32;                                                                           // Number of samples per subpixel
+const int         SAMPLES         = 100;                                                                           // Number of samples per subpixel
 const int         WIDTH           = 512;                                                                          // Resolution of the final image
 const int         HEIGHT          = 384;
 const double      FOVANGLE        = 0.5135;
 const int         XSUBSAMPLES     = 2;                                                                         // Number of samples to split a pixel into. 
 const int         YSUBSAMPLES     = 2;
 const std::string FILENAME        = "image.ppm";
-const long long   SEED            = 31415926535;
+const long long   SEED            = 314159265;
 const int         RECURSIVE_LIMIT = 10;
 const int         ROULETTE_LIMIT  = 5;
 const double      M_PI            = 3.14159265358979;
@@ -47,20 +48,50 @@ double   clamp(double);
 void     writeToFile();
 double   applyGamma(double);
 int      convertToIntegerRange(double);
+int      toInt(double);
 
 
 // Scene from smallPT. 
-Sphere spheres[] = { // Sphere: radius, position, emission, color, material 
-  Sphere(1e5,  Vector3d( 1e5 + 1, 40.8, 81.6),   Vector3d(),            Vector3d(0.75, 0.25, 0.25), MaterialType::DIFFUSE),    // Left 
-  Sphere(1e5,  Vector3d(-1e5 + 99, 40.8, 81.6),  Vector3d(),            Vector3d(0.25, 0.25, 0.75), MaterialType::DIFFUSE),    // Right 
-  Sphere(1e5,  Vector3d(50, 40.8, 1e5),          Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Back 
-  Sphere(1e5,  Vector3d(50, 40.8, -1e5 + 170),   Vector3d(),            Vector3d(),                 MaterialType::DIFFUSE),    // Front 
-  Sphere(1e5,  Vector3d(50, 1e5, 81.6),          Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Bottom 
-  Sphere(1e5,  Vector3d(50, -1e5 + 81.6, 81.6),  Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Top 
-  Sphere(16.5, Vector3d(27, 16.5, 47),           Vector3d(),            Vector3d(1, 1, 1) * 0.999,  MaterialType::SPECULAR),   // Mirror 
-  Sphere(16.5, Vector3d(73, 16.5, 78),           Vector3d(),            Vector3d(1, 1, 1) * 0.999,  MaterialType::REFRACTIVE), // Glass 
-  Sphere(600,  Vector3d(50, 681.6 - 0.27, 81.6), Vector3d(12, 12, 12),  Vector3d(),                 MaterialType::DIFFUSE)     // Light 
-}; 
+Vector3d tc(0.0588, 0.361, 0.0941);
+Vector3d sc = Vector3d(1,1,1)*.7;
+Sphere spheres[] = {//Scene: radius, position, emission, color, material
+  // center 50 40.8 62
+  // floor 0
+  // back  0
+//  Sphere(1e5, Vector3d(50, 1e5+100, 0),  Vector3d(1,1,1)*1,Vector3d(),MaterialType::DIFFUSE), //lite
+//  Sphere(1e5, Vector3d(50, -1e5, 0),  Vector3d(),Vector3d(.3,.3,.1),MaterialType::DIFFUSE), //grnd
+//  Sphere(1e5, Vector3d(50, 1e5+100, 0),  Vector3d(0.761, 0.875, 1.00)*1.3,Vector3d(),MaterialType::DIFFUSE),
+//  //lite
+  Sphere(1e5, Vector3d(50, 1e5+130, 0),  Vector3d(1,1,1)*1.3,Vector3d(),MaterialType::DIFFUSE), //lite
+  Sphere(1e2, Vector3d(50, -1e2+2, 47),  Vector3d(),Vector3d(1,1,1)*.7,MaterialType::DIFFUSE), //grnd
+
+  Sphere(1e4, Vector3d(50, -30, 300)+Vector3d(-sin(50*M_PI/180),0,cos(50*M_PI/180))*1e4, Vector3d(), Vector3d(1,1,1)*.99,MaterialType::SPECULAR),// mirr L
+  Sphere(1e4, Vector3d(50, -30, 300)+Vector3d(sin(50*M_PI/180),0,cos(50*M_PI/180))*1e4,  Vector3d(), Vector3d(1,1,1)*.99,MaterialType::SPECULAR),// mirr R
+  Sphere(1e4, Vector3d(50, -30, -50)+Vector3d(-sin(30*M_PI/180),0,-cos(30*M_PI/180))*1e4,Vector3d(), Vector3d(1,1,1)*.99,MaterialType::SPECULAR),// mirr FL
+  Sphere(1e4, Vector3d(50, -30, -50)+Vector3d(sin(30*M_PI/180),0,-cos(30*M_PI/180))*1e4, Vector3d(), Vector3d(1,1,1)*.99,MaterialType::SPECULAR),// mirr
+
+
+  Sphere(4, Vector3d(50,6*.6,47),   Vector3d(),Vector3d(.13,.066,.033), MaterialType::DIFFUSE),//"tree"
+  Sphere(16,Vector3d(50,6*2+16*.6,47),   Vector3d(), tc,  MaterialType::DIFFUSE),//"tree"
+  Sphere(11,Vector3d(50,6*2+16*.6*2+11*.6,47),   Vector3d(), tc,  MaterialType::DIFFUSE),//"tree"
+  Sphere(7, Vector3d(50,6*2+16*.6*2+11*.6*2+7*.6,47),   Vector3d(), tc,  MaterialType::DIFFUSE),//"tree"
+
+  Sphere(15.5,Vector3d(50,1.8+6*2+16*.6,47),   Vector3d(), sc,  MaterialType::DIFFUSE),//"tree"
+  Sphere(10.5,Vector3d(50,1.8+6*2+16*.6*2+11*.6,47),   Vector3d(), sc,  MaterialType::DIFFUSE),//"tree"
+  Sphere(6.5, Vector3d(50,1.8+6*2+16*.6*2+11*.6*2+7*.6,47),   Vector3d(), sc,  MaterialType::DIFFUSE),//"tree"
+};
+
+/*Sphere spheres[] = { // Sphere: radius, position, emission, color, material 
+  Sphere(1e5,  Vector3d( 1e5 + 1, 40.8, 81.6),   Vector3d(),                  Vector3d(0.75, 0.25, 0.25), MaterialType::DIFFUSE),    // Left 
+  Sphere(1e5,  Vector3d(-1e5 + 99, 40.8, 81.6),  Vector3d(),                  Vector3d(0.25, 0.25, 0.75), MaterialType::DIFFUSE),    // Right 
+  Sphere(1e5,  Vector3d(50, 40.8, 1e5),          Vector3d(),                  Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Back 
+  Sphere(1e5,  Vector3d(50, 40.8, -1e5 + 170),   Vector3d(),                  Vector3d(),                 MaterialType::DIFFUSE),    // Front 
+  Sphere(1e5,  Vector3d(50, 1e5, 81.6),          Vector3d(),                  Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Bottom 
+  Sphere(1e5,  Vector3d(50, -1e5 + 81.6, 81.6),  Vector3d(),                  Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Top 
+  Sphere(16.5, Vector3d(27, 16.5, 47),           Vector3d(),                  Vector3d(1, 1, 1) * 0.999,  MaterialType::SPECULAR),   // Mirror 
+  Sphere(16.5, Vector3d(73, 16.5, 78),           Vector3d(),                  Vector3d(1, 1, 1) * 0.999,  MaterialType::REFRACTIVE), // Glass 
+  Sphere(1.5,  Vector3d(50, 81.6 - 16.5, 81.6),  Vector3d(4, 4, 4) * 100,     Vector3d(),                 MaterialType::DIFFUSE)     // Light 
+}; */
 
 int sphereLength = (int) (sizeof(spheres) / sizeof(Sphere));
 Vector3d *image = new Vector3d[WIDTH*HEIGHT];                                            // An array holding (r,g,b) values for each pixel. 
@@ -89,11 +120,11 @@ int main()
 #pragma omp parallel for schedule(dynamic, 1) private(color)                               // Each loop iteration should run in its own thread. 
   for(int y = 0; y < HEIGHT; ++y)                                                          // Image rows. 
   {
-   // now = std::chrono::system_clock::now();
-    //elapsedSeconds = now - start;
-    //omp_set_lock(&writeLock);
-    //printf("\rRendering (%d samples): %5.2f%%. Elapsed time: %fs", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
-   // omp_unset_lock(&writeLock);
+    now = std::chrono::system_clock::now();
+    elapsedSeconds = now - start;
+    omp_set_lock(&writeLock);
+    printf("\rRendering (%d samples): %5.2f%%. Elapsed time: %fs", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
+    omp_unset_lock(&writeLock);
 
     for(unsigned short x = 0; x < WIDTH; ++x)                                              // Image columns. 
     {
@@ -162,18 +193,20 @@ Vector3d radiance(const Ray &ray, int depth, int E)
 
   // Use maximum reflectance for Russian Roulette. 
   double maxRefl;
-
   if(BRDFModulator.x > BRDFModulator.y && BRDFModulator.x > BRDFModulator.z)
   {
     maxRefl = BRDFModulator.x;
   }
-  else if(BRDFModulator.y > BRDFModulator.z)
-  {
-    maxRefl = BRDFModulator.y;
-  }
   else
   {
-    maxRefl = BRDFModulator.z;
+    if(BRDFModulator.y > BRDFModulator.z)
+    {
+      maxRefl = BRDFModulator.y;
+    }
+    else
+    {
+      maxRefl = BRDFModulator.z;
+    }
   }
 
   if(++depth > ROULETTE_LIMIT || !maxRefl)                                 // Only do russian roulette after a recursion depth of ROULETTE_LIMIT. 
@@ -195,21 +228,21 @@ Vector3d radiance(const Ray &ray, int depth, int E)
     double r2 = distribution(mtGenerator);                // distance from
     double r2s = sqrt(r2);                                // center - Random
 
-    Vector3d z = surfaceNormal;                           // Vectors x, y, z are used to create an orthonormal coordinate frame
-    Vector3d x;                                           // around the normal to sample the unit hemisphere. (x is perpendicular to z)
+    Vector3d w = surfaceNormal;                           // Vectors w, u, v are used to create an orthonormal coordinate frame
+    Vector3d u;                                           // around the normal to sample the unit hemisphere. (x is perpendicular to z)
 
-    if(fabs(x.x) > 0.1)
+    if(fabs(w.x) > 0.1)
     {
-      x = Vector3d(0, 1, 0);
+      u = Vector3d(0, 1, 0);
     }
     else
     {
-      x = Vector3d(1, 0, 0);
+      u = Vector3d(1, 0, 0);
     }
-    x = x.cross(z).unit();
-    Vector3d y = z.cross(x);                              // Perpendicular to x and z. 
+    u = u.cross(w).unit();
+    Vector3d v = w.cross(u);                              // Perpendicular to x and z. 
 
-    Vector3d reflectanceRayDir = ((x * cos(r1) * r2s) + (y * sin(r1) * r2s) + (z * sqrt(1 - r2))).unit(); // Create a random(based on r1, r2) reflectance ray within the hemisphere. 
+    Vector3d reflectanceRayDir = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).unit(); // Create a random(based on r1, r2) reflectance ray within the hemisphere. 
     
     // Sampling Lights
     Vector3d lighting;
@@ -321,14 +354,22 @@ void writeToFile()
 
   for(int pixel = 0; pixel < WIDTH * HEIGHT; ++pixel)
   {
-     int r = convertToIntegerRange(applyGamma(image[pixel].x));
-     int g = convertToIntegerRange(applyGamma(image[pixel].y));
-     int b = convertToIntegerRange(applyGamma(image[pixel].z));
+    assert(toInt(image[pixel].x) == convertToIntegerRange(applyGamma(image[pixel].x)));
+    file << toInt(image[pixel].x) << " " << toInt(image[pixel].y) << " " << toInt(image[pixel].z) << " ";
+   //  int r = convertToIntegerRange(applyGamma(image[pixel].x));
+   //  int g = convertToIntegerRange(applyGamma(image[pixel].y));
+   //  int b = convertToIntegerRange(applyGamma(image[pixel].z));
   
-     file << r << " " << g << " " << b << " ";
+   //  file << r << " " << g << " " << b << " ";
   }
 
   file.close();
+}
+
+// Comparing with my own 2 seperate functions
+int toInt(double x)
+{
+  return int(pow(clamp(x), 1 / 2.2) * 255 + .5);
 }
 
 /// Applies a gamma correction constant. 
@@ -348,9 +389,10 @@ int convertToIntegerRange(double value)
 bool intersectCheck(const Ray &ray, double &temporary, int &id)
 {
   temporary = INFINITYAPP;                                       // Used to store the current closest ray hit. 
+  double numSpheres = sizeof(spheres) / sizeof(Sphere);
   double distance;
 
-  for(int i = sphereLength; i >= 0; --i)                      // Loop through all spheres
+  for(int i = int(numSpheres); i--;)                      // Loop through all spheres
   {
     distance = spheres[i].intersect(ray);
 
@@ -360,7 +402,6 @@ bool intersectCheck(const Ray &ray, double &temporary, int &id)
       temporary = distance;
     }
   } 
-
   return (temporary < INFINITYAPP);
 }
 
