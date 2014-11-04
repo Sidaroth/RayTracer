@@ -1,7 +1,7 @@
-// Author: Christian Holt              //
-// Last Edit: 16.10.14                 //
-// Purpose: Definition of a sphere.    //
-/////////////////////////////////////////
+// Author: Christian Holt              
+// Last Edit: 04.11.14                 
+// Purpose: Definition of a sphere.    
+///////////////////////////////////////
 
 #pragma once
 

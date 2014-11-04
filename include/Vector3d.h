@@ -3,7 +3,7 @@
 //				in the dynamic array sense (as STL vector is)		    //
 // 				Adapted from my Vector2f version. (Thanks Khan Academy) //
 //	Author:		Christian Holt										    //
-//	Last Edit:	16/10/2014											    //
+//	Last Edit:	04/11/2014											    //
 //																	    //
 //////////////////////////////////////////////////////////////////////////
 

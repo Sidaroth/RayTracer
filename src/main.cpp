@@ -1,5 +1,5 @@
 // Author: Christian Holt              		 
-// Last Edit: 04.02.14                 		 
+// Last Edit: 04.11.14                 		 
 // Purpose: A basic raytracer. Aspects of this may be overly commented, but this is done as a learning exercise so the comments are equally for
 //          the authors benefit. Having to put what happens into words furthers our understanding.   		
 // 
@@ -26,7 +26,7 @@
 
 /// CONSTANTS
 const double      INFINITYAPP     = 1e20;                                                                         // Our approximation of infinity. 
-const int         SAMPLES         = 50;                                                                           // Number of samples per subpixel
+const int         SAMPLES         = 8;                                                                           // Number of samples per subpixel
 const int         WIDTH           = 1024;                                                                          // Resolution of the final image
 const int         HEIGHT          = 768;
 const double      FOVANGLE        = 0.5135;
@@ -36,6 +36,9 @@ const std::string FILENAME        = "image.ppm";
 const long long   SEED            = 31415926535;
 const int         RECURSIVE_LIMIT = 10;
 const int         ROULETTE_LIMIT  = 5;
+const double      M_PI            = 3.14159265358979;
+const double      M_1_PI          = 1.0 / M_PI;
+const int         THREADS         = 12;
 
 /// Function decl. 
 bool     intersectCheck(const Ray&, double&, int&);
@@ -68,12 +71,13 @@ std::uniform_real_distribution<> distribution(0, 1);                            
 int main()
 {
   /////// SETUP ////////////
-  printf("\nBeginning Ray Trace.");
+  printf("\nBeginning Ray Trace.\n");
   std::chrono::time_point<std::chrono::system_clock> start, now, end;
   std::chrono::duration<double> elapsedSeconds;
   start = std::chrono::system_clock::now();
 
   omp_lock_t writeLock;
+  omp_set_num_threads(THREADS);
   omp_init_lock(&writeLock);
 
   Ray camera(Vector3d(50, 52, 295.6), Vector3d(0, -0.042612, -1).unit());                  // Camera position and direction. Also taken from SmallPT to match the scene. 
@@ -125,7 +129,7 @@ int main()
   end = std::chrono::system_clock::now();
   elapsedSeconds = end - start;
 
-  printf("\n\nSucessfully wrote to file (%s). Total time taken to trace: %f seconds.\n", FILENAME.c_str(),elapsedSeconds.count());
+  printf("\n\nSucessfully wrote to file (%s). Total time taken to trace: %f seconds.\n", FILENAME.c_str(), elapsedSeconds.count());
   omp_destroy_lock(&writeLock);
 	
   return 0;
@@ -133,6 +137,7 @@ int main()
 
 ///////// FUNCTIONS /////////
 
+/// Radiance method needs some cleanup, should probably seperate out the different material types etc. (i.e a switch with function calls)
 /// Any reference to Vector3d(); is a Vector with values (0, 0, 0) for RGB, i.e black. 
 Vector3d radiance(const Ray &ray, int depth, int E)
 {
@@ -186,6 +191,121 @@ Vector3d radiance(const Ray &ray, int depth, int E)
   // IDEAL DIFFUSE REFLECTION
   if(sphere.materialType == MaterialType::DIFFUSE)
   {
+    double r1 = 2 * M_PI * distribution(mtGenerator);     // Angle around randomly
+    double r2 = distribution(mtGenerator);                // distance from
+    double r2s = sqrt(r2);                                // center - Random
+
+    Vector3d z = surfaceNormal;                           // Vectors x, y, z are used to create an orthonormal coordinate frame
+    Vector3d x;                                           // around the normal to sample the unit hemisphere. (x is perpendicular to z)
+
+    if(fabs(x.x) > 0.1)
+    {
+      x = Vector3d(0, 1, 0);
+    }
+    else
+    {
+      x = Vector3d(1, 0, 0);
+    }
+    x = x.cross(z).unit();
+    Vector3d y = z.cross(x);                              // Perpendicular to x and z. 
+
+    Vector3d reflectanceRayDir = ((x * cos(r1) * r2s) + (y * sin(r1) * r2s) + (z * sqrt(1 - r2))).unit(); // Create a random(based on r1, r2) reflectance ray within the hemisphere. 
+    
+    // Sampling Lights
+    Vector3d lighting;
+    for(int i = 0; i < sphereLength; ++i)
+    {
+      const Sphere &light = spheres[i];
+      if(light.emission.x <= 0 && light.emission.y <= 0 && light.emission.z <= 0)
+      {
+        continue;                                                 //// Skip any spheres that are not light sources. 
+      }
+
+      // Create another coordinate system sw, su, sv similar to x,y,z above.
+      Vector3d sw = light.position - intersectPoint;
+      Vector3d su;
+
+      if(fabs(sw.x) > 0.1)
+      {
+        su = Vector3d(0, 1, 0);
+      }
+      else
+      {
+        su = Vector3d(1, 0, 0);
+      }
+      su = su.cross(sw).unit();
+      Vector3d sv = sw.cross(su);
+
+      double cosMax = sqrt(1 - light.radius * light.radius / (intersectPoint - light.position).dot(intersectPoint - light.position)); // Determine max angle
+      double eps1 = distribution(mtGenerator);
+      double eps2 = distribution(mtGenerator);            // Calculating sample direction. (This is based on an equation from Realistic Ray Tracing by Shirley et.al)
+      double cosA = 1 - eps1 + eps1 * cosMax;
+      double sinA = sqrt(1 - cosA * cosA);
+      double phi = 2 * M_PI * eps2;
+
+      Vector3d sampleDir = su * cos(phi) * sinA + sv * sin(phi) * sinA + sw * cosA;
+      sampleDir = sampleDir.unit();
+
+      // Shoot shadow ray
+      if (intersectCheck(Ray(intersectPoint, sampleDir), distance, id) && id == i)
+      {
+        double omega = 2 * M_PI * (1 - cosMax);
+        lighting = lighting + BRDFModulator * (light.emission * sampleDir.dot(surfaceNormal) * omega) * M_1_PI; // 1/pi for BRDF
+      }
+
+      return sphere.emission * E + lighting + BRDFModulator * (radiance(Ray(intersectPoint, reflectanceRayDir), depth, 0));
+    }
+  }
+  else if(sphere.materialType == MaterialType::SPECULAR)  // IDEAL SPECULAR REFLECTION
+  {
+    // Angle of incidence == Angle of Reflection, R = D - 2(N dot D)N. 
+    Vector3d recursive = radiance(Ray(intersectPoint, ray.direction - normal * 2 * normal.dot(ray.direction)), depth);
+    return sphere.emission + BRDFModulator * recursive;
+  }
+  else                                                    // DIELECTRIC SURFACE. (Glass)
+  {
+    // Again, angle of incidence = angle of reflection -- IDEAL
+    Ray reflectanceRay(intersectPoint, ray.direction - normal * 2 * normal.dot(ray.direction));
+    bool into = normal.dot(surfaceNormal) > 0;          // entering or exiting glass
+
+    double ior = 1.5;                                    // Index of Refraction (ior) for glass is 1.5, nnt is either 1.5 or 1/1.5 depending on entry or exit. 
+    double nnt = into ? 1 / ior : ior / 1;
+    double ddn = ray.direction.dot(surfaceNormal);      
+    double angle = 1 - nnt * nnt * (1 - ddn * ddn);     // angle of exit from the glass. 
+
+    // Total Internal Reflection
+    if(angle < 0)                                       // if the angle is too shallow, all light is reflected. 
+    {
+      return sphere.emission + BRDFModulator * (radiance(reflectanceRay, depth));
+    }
+
+    // Otherwise, choose reflection or refraction with Fresnel's Term. 
+    Vector3d transmissionDir = (ray.direction * nnt - normal * ((into ? 1 : -1) * (ddn * nnt + sqrt(angle)))).unit();
+    double a  = ior - 1;
+    double b  = ior + 1;
+    double R0 = a * a / (b * b);                                     // Reflectance at normal incidence based on IOR. 
+    double c  = 1 - (into ? -ddn : transmissionDir.dot(normal));     // 1 - cos(theta)
+    double Re = R0 + (1 - R0) * c * c * c * c * c;                   // Fresnel Reflectance. 
+    double Tr = 1 - Re;
+    double P  = 0.25 + 0.5 * Re;                                     // Probability of reflecting
+    double Rp = Re / P;
+    double Tp = Tr / (1 - P);
+
+    if(depth > 2)
+    {
+      if(distribution(mtGenerator) < P)
+      {
+        radiance(reflectanceRay, depth) * Rp;                              // Reflection
+      }
+      else
+      {
+        radiance(Ray(intersectPoint, transmissionDir), depth) * Tp; // Refraction
+      }
+    }
+    else
+    {
+      radiance(reflectanceRay, depth) * Re + radiance(Ray(intersectPoint, transmissionDir), depth) * Tr;
+    }
 
   }
 
