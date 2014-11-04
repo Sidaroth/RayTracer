@@ -15,26 +15,29 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <chrono>
+#include <ctime>
+#include <string>
 #include "Sphere.h"
 #include "Vector3d.h"
 #include "globals.h"                                                                                  
 
-/// CONSTS
-const double INFINITY = 1e20;                                                                         // Our approximation of infinity. 
-const int    SAMPLES  = 50;                                                                           // Number of samples per subpixel
-const int    WIDTH    = 1024;                                                                          // Resolution of the final image
-const int    HEIGHT   = 768;
-const double FOVANGLE = 0.5135;
-const int    XSUBSAMPLES = 2;                                                                         // Number of samples to split a pixel into. 
-const int    YSUBSAMPLES = 2;
+/// CONSTANTS
+const double      INFINITY = 1e20;                                                                         // Our approximation of infinity. 
+const int         SAMPLES  = 50;                                                                           // Number of samples per subpixel
+const int         WIDTH    = 1024;                                                                          // Resolution of the final image
+const int         HEIGHT   = 768;
+const double      FOVANGLE = 0.5135;
+const int         XSUBSAMPLES = 2;                                                                         // Number of samples to split a pixel into. 
+const int         YSUBSAMPLES = 2;
+const std::string FILENAME = "image.ppm";
 
 /// Function decl. 
-bool intersectCheck(Ray, double, double);
+bool     intersectCheck(Ray, double, double);
 Vector3d radiance(Ray, int, unsigned short);
-double clamp(double);
-bool writeToFile();
-double applyGamma(double);
-int    convertToIntegerRange(double);
+double   clamp(double);
+void     writeToFile();
+double   applyGamma(double);
+int      convertToIntegerRange(double);
 
 
 // Scene from smallPT. 
@@ -55,9 +58,12 @@ int sphereLength = (int) (sizeof(spheres) / sizeof(Sphere));
 
 int main()
 {
-	printf("Hello World, I am a RayTracer!");
-
   /////// SETUP ////////////
+  printf("\nBeginning Ray Trace.");
+  std::chrono::time_point<std::chrono::system_clock> start, now, end;
+  std::chrono::duration<double> elapsedSeconds;
+  start = std::chrono::system_clock::now();
+
   Ray camera(Vector3d(50, 52, 295.6), Vector3d(0, -0.042612, -1).unit());                  // Camera position and direction. Also taken from SmallPT to match the scene. 
   Vector3d cx = Vector3d(WIDTH * FOVANGLE / HEIGHT, 0, 0);                                 // X-direction increment. (assumes a camera that is upright) - X camera direction. 
   Vector3d cy = cx.cross(camera.direction).unit() * FOVANGLE;                              // Y-direction increment. (cross product gets vector perpendicular to CX and gaze direction - the vertical up vector)
@@ -69,7 +75,9 @@ int main()
 #pragma omp parallel for schedule(dynamic, 1) private(r)                                   // Each loop iteration should run in its own thread. 
   for(int y = 0; y < HEIGHT; ++y)                                                          // Image rows. 
   {
-    prinft("\rRendering (%d samples): %5.2f%%", SAMPLES * 4, 100.0 * y / (HEIGHT - 1));    // Print progress
+    now = std::chrono::system_clock::now();
+    elapsedSeconds = now - start;
+    prinft("\rRendering (%d samples): %5.2f%%. Elapsed time: %ds", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
     unsigned short Xi[3] = {0, 0, y * y * y};                                              // Used for tent filter.
 
     for(unsigned short x = 0; x < WIDTH; ++x)                                              // Image columns. 
@@ -102,25 +110,22 @@ int main()
     }
   }
 
-  if(writeToFile())
-  {
-    printf("ERROR: Writing to file failed");
-    return 0;
-  }
-  else
-  {
-	  return -31415;  
-  }
+  writeToFile();
+  end = std::chrono::system_clock::now();
+  elapsedSeconds = end - start;
 
+  printf("Sucessfully wrote to file (%s). Total time taken to trace: %d seconds.", FILENAME.c_str(),elapsedSeconds.count());
+	
+  return 0;
 }
 
 ///////// FUNCTIONS /////////
 
 /// Format: http://netpbm.sourceforge.net/doc/ppm.html#plainppm 
-bool writeToFile()
+void writeToFile()
 {
   ofstream file;
-  file.open("image.ppm");
+  file.open(FILENAME.c_str());
   file << "P3\n" << WIDTH << " " << HEIGHT << "\n255\n";
 
   for(int pixel = 0; i < WIDTH * HEIGHT; ++pixel)
@@ -132,9 +137,7 @@ bool writeToFile()
      file << r << " " << g << " " << b << " ";
   }
 
-  file.close()
-;1
-  return false;
+  file.close();
 }
 
 /// Applies a gamma correction constant. 
