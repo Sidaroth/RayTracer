@@ -60,10 +60,49 @@ Sphere::Sphere(double radius, Vector3d position, Vector3d emission,
 // Beware -- This function relies heavily on overloaded operators from Vector3d.
 double Sphere::intersect(const Ray &ray)
 {
-	Vector3d oc = ray.origin - this -> position; 		// (o-c)
-	double loc = ray.direction.dot(oc); 		    	// (l dot (o -c)
-	double ocLength = oc.length();			  			// |o-c|
-	double r2 = this -> radius * this -> radius;	  		// r2
+	Vector3d oc = position - ray.origin; 		
+
+	double distance;
+	double fudge = 1e-4;
+	double b = oc.dot(ray.direction);							// 1/2 b for quadratic eq. setup
+	double determinant = b * b - oc.dot(oc) + radius * radius; // b^2-4ac -- a = 1 because ray is normalized. 
+
+	if(determinant < 0)
+	{
+		return 0;
+	}
+	else
+	{
+		determinant = sqrt(determinant);
+	}
+
+	distance = b - determinant;
+
+	// Return lowest positive distance, or 0 for miss. 
+	if(distance > fudge)
+	{
+		return distance;
+	}
+	else
+	{
+		distance = b + determinant;
+		if(distance > fudge)
+		{
+			return distance;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+}
+
+/*double Sphere::intersect(const Ray &ray)
+{
+	Vector3d oc = this -> position - ray.origin; 		
+	double loc = ray.direction.dot(oc); 		    
+	double ocLength = oc.length();			  			
+	double r2 = this -> radius * this -> radius;
 	double det = (loc * loc) - (ocLength * ocLength) + r2;
 
 	if(det < 0)
@@ -86,4 +125,4 @@ double Sphere::intersect(const Ray &ray)
 	{
 		return distance1;
 	}
-}
+}*/

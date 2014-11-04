@@ -26,9 +26,9 @@
 
 /// CONSTANTS
 const double      INFINITYAPP     = 1e20;                                                                         // Our approximation of infinity. 
-const int         SAMPLES         = 8;                                                                           // Number of samples per subpixel
-const int         WIDTH           = 1024;                                                                          // Resolution of the final image
-const int         HEIGHT          = 768;
+const int         SAMPLES         = 32;                                                                           // Number of samples per subpixel
+const int         WIDTH           = 512;                                                                          // Resolution of the final image
+const int         HEIGHT          = 384;
 const double      FOVANGLE        = 0.5135;
 const int         XSUBSAMPLES     = 2;                                                                         // Number of samples to split a pixel into. 
 const int         YSUBSAMPLES     = 2;
@@ -55,7 +55,7 @@ Sphere spheres[] = { // Sphere: radius, position, emission, color, material
   Sphere(1e5,  Vector3d(-1e5 + 99, 40.8, 81.6),  Vector3d(),            Vector3d(0.25, 0.25, 0.75), MaterialType::DIFFUSE),    // Right 
   Sphere(1e5,  Vector3d(50, 40.8, 1e5),          Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Back 
   Sphere(1e5,  Vector3d(50, 40.8, -1e5 + 170),   Vector3d(),            Vector3d(),                 MaterialType::DIFFUSE),    // Front 
-  Sphere(1e5,  Vector3d(50, 1e5, 81.6),          Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Bottomm 
+  Sphere(1e5,  Vector3d(50, 1e5, 81.6),          Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Bottom 
   Sphere(1e5,  Vector3d(50, -1e5 + 81.6, 81.6),  Vector3d(),            Vector3d(0.75, 0.75, 0.75), MaterialType::DIFFUSE),    // Top 
   Sphere(16.5, Vector3d(27, 16.5, 47),           Vector3d(),            Vector3d(1, 1, 1) * 0.999,  MaterialType::SPECULAR),   // Mirror 
   Sphere(16.5, Vector3d(73, 16.5, 78),           Vector3d(),            Vector3d(1, 1, 1) * 0.999,  MaterialType::REFRACTIVE), // Glass 
@@ -89,11 +89,11 @@ int main()
 #pragma omp parallel for schedule(dynamic, 1) private(color)                               // Each loop iteration should run in its own thread. 
   for(int y = 0; y < HEIGHT; ++y)                                                          // Image rows. 
   {
-    now = std::chrono::system_clock::now();
-    elapsedSeconds = now - start;
-    omp_set_lock(&writeLock);
-    printf("\rRendering (%d samples): %5.2f%%. Elapsed time: %fs", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
-    omp_unset_lock(&writeLock);
+   // now = std::chrono::system_clock::now();
+    //elapsedSeconds = now - start;
+    //omp_set_lock(&writeLock);
+    //printf("\rRendering (%d samples): %5.2f%%. Elapsed time: %fs", SAMPLES * 4, 100.0 * y / (HEIGHT - 1), elapsedSeconds.count());    // Print progress
+   // omp_unset_lock(&writeLock);
 
     for(unsigned short x = 0; x < WIDTH; ++x)                                              // Image columns. 
     {
@@ -247,7 +247,7 @@ Vector3d radiance(const Ray &ray, int depth, int E)
       sampleDir = sampleDir.unit();
 
       // Shoot shadow ray
-      if (intersectCheck(Ray(intersectPoint, sampleDir), distance, id) && id == i)
+      if(intersectCheck(Ray(intersectPoint, sampleDir), distance, id) && id == i)
       {
         double omega = 2 * M_PI * (1 - cosMax);
         lighting = lighting + BRDFModulator * (light.emission * sampleDir.dot(surfaceNormal) * omega) * M_1_PI; // 1/pi for BRDF
@@ -287,7 +287,7 @@ Vector3d radiance(const Ray &ray, int depth, int E)
     double c  = 1 - (into ? -ddn : transmissionDir.dot(normal));     // 1 - cos(theta)
     double Re = R0 + (1 - R0) * c * c * c * c * c;                   // Fresnel Reflectance. 
     double Tr = 1 - Re;
-    double P  = 0.25 + 0.5 * Re;                                     // Probability of reflecting
+    double P  = 0.25 + (0.5 * Re);                                     // Probability of reflecting
     double Rp = Re / P;
     double Tp = Tr / (1 - P);
 
@@ -295,16 +295,16 @@ Vector3d radiance(const Ray &ray, int depth, int E)
     {
       if(distribution(mtGenerator) < P)
       {
-        radiance(reflectanceRay, depth) * Rp;                              // Reflection
+        return sphere.emission + BRDFModulator * (radiance(reflectanceRay, depth) * Rp);                              // Reflection
       }
       else
       {
-        radiance(Ray(intersectPoint, transmissionDir), depth) * Tp; // Refraction
+        return sphere.emission + BRDFModulator * (radiance(Ray(intersectPoint, transmissionDir), depth) * Tp);        // Refraction
       }
     }
     else
     {
-      radiance(reflectanceRay, depth) * Re + radiance(Ray(intersectPoint, transmissionDir), depth) * Tr;
+      return sphere.emission + BRDFModulator * (radiance(reflectanceRay, depth) * Re + radiance(Ray(intersectPoint, transmissionDir), depth) * Tr); 
     }
 
   }
