@@ -1,7 +1,7 @@
 # The compiler
 CC=g++
 # Flags for the compiler
-CFLAGS=-c -Wall -std=c++11 -fopenmp
+CFLAGS=-c -Wall -std=c++11 -fopenmp -lpthread
 
 # Name of the executable
 EXECUTABLE=RayTracer.exe
@@ -19,7 +19,7 @@ INC=-I ./include/
 # Flags for the linker. (When adding new libraries, add another flag here, as such: -lexample-lib) PS: These are the libexample-lib.so files, with the lib prefix and .so extension removed. 
 #CURLFLAGS=   -lcurl
 
-LFLAGS= #$(CURLFLAGS)
+LFLAGS= -fopenmp
 
 # Source files (Add your files here for compilation. *Only the .cpp files*)
 SOURCES= ./src/main.cpp ./src/Sphere.cpp ./src/Vector3d.cpp ./src/Ray.cpp
